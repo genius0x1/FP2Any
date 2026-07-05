@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FP2Any</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="card">
+    <h1>FP2Any&nbsp;·&nbsp;Forcepoint&nbsp;→&nbsp;Any</h1>
+    <p class="subtitle">
+      Upload a Forcepoint firewall <code>exported.xml</code>, then choose an
+      operation: extract to a structured Excel workbook (one sheet per element
+      type, faithful 1:1) or generate a Palo Alto PAN-OS CLI migration file.
+    </p>
+
+    {% if error %}
+    <div class="alert">{{ error }}</div>
+    {% endif %}
+
+    <form action="/convert" method="post" enctype="multipart/form-data" id="form">
+      <label class="drop" id="drop">
+        <input type="file" name="file" accept=".xml" id="file" required hidden>
+        <span class="drop-icon">⬆</span>
+        <span class="drop-text" id="drop-text">Click to choose an XML file (or drag &amp; drop)</span>
+      </label>
+      <button type="submit" class="btn" id="submit">Upload &amp; analyze</button>
+    </form>
+
+    <p class="hint">Max upload size 50&nbsp;MB. Processing is stateless — nothing is stored after download.</p>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('file');
+    const dropText = document.getElementById('drop-text');
+    const drop = document.getElementById('drop');
+    const form = document.getElementById('form');
+    const submit = document.getElementById('submit');
+
+    fileInput.addEventListener('change', () => {
+      dropText.textContent = fileInput.files.length ? fileInput.files[0].name
+                                                     : 'Click to choose an XML file (or drag & drop)';
+    });
+    ['dragover', 'dragenter'].forEach(e =>
+      drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(e =>
+      drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', ev => { fileInput.files = ev.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change')); });
+    form.addEventListener('submit', () => {
+      submit.disabled = true; submit.textContent = 'Uploading & parsing…';
+    });
+  </script>
+</body>
+</html>

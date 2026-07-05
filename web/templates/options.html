@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose an operation — FP2Any</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="card card-mid">
+    <h1>✅ File parsed — choose an operation</h1>
+    <p class="subtitle">
+      Extracted <strong>{{ total }}</strong> elements from
+      <code>{{ source }}</code>{% if build %} (build {{ build }}, update {{ version }}){% endif %}.
+      Pick the scope first — it applies to every operation below.
+    </p>
+
+    <div class="filters options-filters">
+      <label>Policy
+        <select id="policy" onchange="updateHint()">
+          <option value="{{ all_token }}"{% if selected_policy == all_token %} selected{% endif %}>All policies</option>
+          <option value="{{ none_token }}"{% if selected_policy == none_token %} selected{% endif %}>None — engine data only</option>
+          {% for p in policies %}
+          <option value="{{ p }}"{% if selected_policy == p %} selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Engine
+        <select id="engine" onchange="updateHint()">
+          <option value="{{ all_token }}"{% if selected_engine == all_token %} selected{% endif %}>All engines</option>
+          <option value="{{ none_token }}"{% if selected_engine == none_token %} selected{% endif %}>None — policy data only</option>
+          {% for e in engines %}
+          <option value="{{ e }}"{% if selected_engine == e %} selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <p class="scope-hint" id="scope-hint"></p>
+
+    <div class="options">
+      <div class="option">
+        <div class="option-icon">📊</div>
+        <h2>XML to Excel</h2>
+        <p>Browse every extracted sheet in the browser — with policy/engine
+           filters and search — and download the structured workbook (.xlsx).</p>
+        <button class="btn" onclick="run('excel', this)">Generate sheets</button>
+        <div class="progress"><div class="progress-fill"></div></div>
+        <div class="progress-label"></div>
+      </div>
+
+      <div class="option">
+        <div class="option-icon"><img src="/static/palo-alto.png" alt="Palo Alto Networks" class="option-logo logo-palo"></div>
+        <h2>Migrate to Palo Alto</h2>
+        <p>Generate PAN-OS <code>set</code> CLI (addresses, services, rules,
+           interfaces, routes), view it in the browser and download the .txt.</p>
+        <button class="btn btn-panos" onclick="run('panos', this)">Generate PAN-OS CLI</button>
+        <div class="progress"><div class="progress-fill"></div></div>
+        <div class="progress-label"></div>
+      </div>
+
+      <div class="option disabled">
+        <div class="option-icon"><img src="/static/fortinet.png" alt="Fortinet" class="option-logo logo-forti"></div>
+        <h2>Migrate to FortiGate <span class="soon">Coming soon</span></h2>
+        <p>FortiOS CLI generation is planned for a later phase and is not
+           available yet.</p>
+        <button class="btn" disabled>Not available</button>
+        <div class="progress"><div class="progress-fill"></div></div>
+        <div class="progress-label"></div>
+      </div>
+    </div>
+
+    <a class="back" href="/">← Convert another file</a>
+  </main>
+
+  <script>
+    const ALL = {{ all_token | tojson }};
+    const NONE = {{ none_token | tojson }};
+    const RULE_COUNTS = {{ rule_counts | tojson }};
+    const IFACE_COUNTS = {{ iface_counts | tojson }};
+
+    function updateHint() {
+      const p = document.getElementById('policy').value;
+      const e = document.getElementById('engine').value;
+      const parts = [];
+      if (p === NONE) parts.push('no policy — rule sheets omitted');
+      else if (p !== ALL) parts.push(`${p}: ${RULE_COUNTS[p] || 0} rules`);
+      if (e === NONE) parts.push('no engine — infra sheets omitted');
+      else if (e !== ALL) parts.push(`${e}: ${IFACE_COUNTS[e] || 0} interfaces`);
+      document.getElementById('scope-hint').textContent =
+        parts.length ? 'Scope — ' + parts.join(' · ') : 'Scope — the whole file (no filter)';
+    }
+    updateHint();
+
+    async function run(op, btn) {
+      const card = btn.closest('.option');
+      const bar = card.querySelector('.progress');
+      const fill = card.querySelector('.progress-fill');
+      const label = card.querySelector('.progress-label');
+      // Only one job at a time from this page.
+      document.querySelectorAll('.option .btn').forEach(b => b.disabled = true);
+      bar.classList.add('show');
+      fill.style.width = '0%';
+      label.textContent = '0% — starting';
+
+      let jobId;
+      try {
+        const qs = new URLSearchParams({
+          policy: document.getElementById('policy').value,
+          engine: document.getElementById('engine').value,
+        });
+        const resp = await fetch(`/run/{{ token }}/${op}?${qs}`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        jobId = data.job;
+      } catch (e) {
+        label.textContent = 'Error: ' + e.message;
+        enableButtons();
+        return;
+      }
+
+      const timer = setInterval(async () => {
+        let st;
+        try {
+          st = await (await fetch(`/progress/${jobId}`)).json();
+        } catch (e) {
+          return;  // transient poll failure — try again on the next tick
+        }
+        fill.style.width = st.pct + '%';
+        label.textContent = st.error ? ('Error: ' + st.error)
+                                     : (st.pct + '% — ' + st.stage);
+        if (st.done) {
+          clearInterval(timer);
+          if (st.error) { enableButtons(); }
+          else { window.location = st.redirect; }
+        }
+      }, 250);
+    }
+
+    function enableButtons() {
+      document.querySelectorAll('.option:not(.disabled) .btn').forEach(b => b.disabled = false);
+    }
+  </script>
+</body>
+</html>

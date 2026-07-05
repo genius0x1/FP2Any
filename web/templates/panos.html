@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Palo Alto CLI — FP2Any</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+  <main class="card card-wide">
+    <div class="result-head">
+      <div>
+        <h1>🔥 Palo Alto (PAN-OS) CLI</h1>
+        <p class="subtitle">
+          Generated <strong>{{ total_lines }}</strong> lines from <code>{{ source }}</code>.
+        </p>
+      </div>
+      <div class="head-actions">
+        {% if policies or engines %}
+        <form method="get" action="/panos-view/{{ token }}" class="filters">
+          {% if policies %}
+          <label>Policy:
+            <select name="policy" onchange="this.form.submit()">
+              <option value="{{ all_token }}"{% if selected_policy == all_token %} selected{% endif %}>All policies</option>
+              <option value="{{ none_token }}"{% if selected_policy == none_token %} selected{% endif %}>None — engine data only</option>
+              {% for p in policies %}
+              <option value="{{ p }}"{% if selected_policy == p %} selected{% endif %}>{{ p }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+          {% if engines %}
+          <label>Engine:
+            <select name="engine" onchange="this.form.submit()">
+              <option value="{{ all_token }}"{% if selected_engine == all_token %} selected{% endif %}>All engines</option>
+              <option value="{{ none_token }}"{% if selected_engine == none_token %} selected{% endif %}>None — policy data only</option>
+              {% for e in engines %}
+              <option value="{{ e }}"{% if selected_engine == e %} selected{% endif %}>{{ e }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+        </form>
+        {% endif %}
+        <a class="btn panos" href="/panos/{{ token }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">⬇ Download PAN-OS CLI (.txt)</a>
+        <a class="btn" href="/panos-xlsx/{{ token }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">⬇ Download Migration Review (.xlsx)</a>
+        <a class="back" href="/options/{{ token }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">← Back to options</a>
+        <a class="back" href="/">← Convert another file</a>
+      </div>
+    </div>
+
+    {% if truncated %}
+    <p class="hint">Showing the first {{ preview_lines }} of {{ total_lines }} lines —
+       download the .txt for the full output.</p>
+    {% endif %}
+
+    <div class="cli-wrap">
+      <pre class="cli">{{ preview }}</pre>
+    </div>
+  </main>
+</body>
+</html>

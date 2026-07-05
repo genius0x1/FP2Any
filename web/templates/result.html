@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversion complete — FP2Any</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+  <main class="card card-wide">
+    <div class="result-head">
+      <div>
+        <h1>✅ Conversion complete</h1>
+        <p class="subtitle">
+          Extracted <strong>{{ total }}</strong> elements from
+          <code>{{ source }}</code>{% if build %} (build {{ build }}, update {{ version }}){% endif %}.
+        </p>
+      </div>
+      <div class="head-actions">
+        {% if policies or engines %}
+        <form method="get" action="/result/{{ token }}" class="filters">
+          {% if policies %}
+          <label>Policy:
+            <select name="policy" onchange="this.form.submit()">
+              <option value="{{ all_token }}"{% if selected_policy == all_token %} selected{% endif %}>All policies</option>
+              <option value="{{ none_token }}"{% if selected_policy == none_token %} selected{% endif %}>None — engine data only</option>
+              {% for p in policies %}
+              <option value="{{ p }}"{% if selected_policy == p %} selected{% endif %}>{{ p }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+          {% if engines %}
+          <label>Engine:
+            <select name="engine" onchange="this.form.submit()">
+              <option value="{{ all_token }}"{% if selected_engine == all_token %} selected{% endif %}>All engines</option>
+              <option value="{{ none_token }}"{% if selected_engine == none_token %} selected{% endif %}>None — policy data only</option>
+              {% for e in engines %}
+              <option value="{{ e }}"{% if selected_engine == e %} selected{% endif %}>{{ e }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+        </form>
+        {% endif %}
+        <a class="btn download" href="/download/{{ token }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">⬇ Download all sheets (.xlsx)</a>
+        <a class="back" href="/options/{{ token }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">← Back to options</a>
+        <a class="back" href="/">← Convert another file</a>
+      </div>
+    </div>
+    {% if (policies and selected_policy != all_token) or (engines and selected_engine != all_token) %}
+    <p class="hint">
+      {% if selected_policy == none_token %}Policy <strong>None</strong>: rule sheets omitted — showing only engine-related data (infra + objects its routes use). {% elif selected_policy != all_token %}Policy <strong>{{ selected_policy }}</strong>: rules + only the objects they use (groups/expressions resolved) + objects the engine's routes use. {% endif %}
+      {% if selected_engine == none_token %}Engine <strong>None</strong>: infra sheets omitted — showing only policy-related data (rules + referenced objects). {% elif selected_engine != all_token %}Engine <strong>{{ selected_engine }}</strong>: Interfaces/Routers/Zones/Servers/Router_Elements limited to it. {% endif %}
+      Policy and engine are independent (the export has no engine↔policy link).
+    </p>
+    {% endif %}
+
+    {% if unknown %}
+    <details class="unknown">
+      <summary>{{ unknown|length }} element type(s) skipped (no dedicated sheet)</summary>
+      <p class="hint">{% for tag, count in unknown.items() %}{{ tag }} ({{ count }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+    </details>
+    {% endif %}
+
+    <!-- Sheet tabs -->
+    <nav class="tabs" id="tabs">
+      {% for s in sheets %}
+      <button class="tab{% if loop.first %} active{% endif %}" data-target="sheet-{{ loop.index }}">
+        {{ s.name }} <span class="badge">{{ s.total }}</span>
+      </button>
+      {% endfor %}
+    </nav>
+
+    <!-- Sheet panels -->
+    {% for s in sheets %}
+    <section class="panel{% if loop.first %} active{% endif %}" id="sheet-{{ loop.index }}">
+      <div class="panel-head">
+        <h2>{{ s.name }} <span class="muted">({{ s.total }} rows)</span></h2>
+        <div class="panel-tools">
+          <input type="search" class="search" placeholder="Search any column…" data-table="table-{{ loop.index }}"
+                 oninput="filterTable(this)">
+          <span class="search-count" id="count-table-{{ loop.index }}"></span>
+          <a class="btn-sm" href="/download/{{ token }}/{{ s.name }}?policy={{ selected_policy|urlencode }}&amp;engine={{ selected_engine|urlencode }}">⬇ Download this sheet</a>
+        </div>
+      </div>
+      {% if s.truncated %}
+      <p class="hint">Showing the first {{ preview_rows }} of {{ s.total }} rows — download the sheet for the full data.</p>
+      {% endif %}
+      <div class="table-wrap">
+        <table class="data" id="table-{{ loop.index }}">
+          <thead>
+            <tr>{% for col in s.columns %}<th>{{ col }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for row in s.rows %}
+            <tr>{% for col in s.columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+    }));
+
+    // Per-sheet search: case-insensitive match across all columns of a row.
+    function filterTable(input) {
+      const table = document.getElementById(input.dataset.table);
+      const q = input.value.trim().toLowerCase();
+      const rows = table.tBodies[0].rows;
+      let shown = 0;
+      for (const row of rows) {
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) shown++;
+      }
+      const counter = document.getElementById('count-' + input.dataset.table);
+      counter.textContent = q ? (shown + ' match' + (shown === 1 ? '' : 'es')) : '';
+    }
+  </script>
+</body>
+</html>

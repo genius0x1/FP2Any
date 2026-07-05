@@ -1,0 +1,50 @@
+# ------------------------------------------------------------
+# FP2Any — keep the repo to source only.
+# Never commit customer firewall exports or generated output.
+# ------------------------------------------------------------
+
+# --- Input data: Forcepoint exports (often real customer configs) ---
+*.xml
+
+# --- Generated output: workbooks and PAN-OS CLI ---
+*.xlsx
+*_panos.txt
+
+# --- Runtime working folders (auto-created by web/app.py) ---
+web/uploads/
+web/outputs/
+
+# --- Logs / dev artifacts ---
+*.log
+putty.log
+
+# --- Internal project plan (not published) ---
+claude.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Editor / tooling / local Claude settings ---
+.claude/
+.vscode/
+.idea/
+*.swp
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db

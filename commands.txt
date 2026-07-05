@@ -1,0 +1,130 @@
+# ============================================================
+#  FP2Any - Command Reference (Forcepoint firewall -> Excel / PAN-OS)
+#  (XML -> Excel + Palo Alto PAN-OS set CLI)
+# ============================================================
+
+# ------------------------------------------------------------
+# 1) DISCOVERY - see what is inside the export first
+# ------------------------------------------------------------
+# List all firewall policies found in the file
+python -m fp2any.cli "all.xml" --list-policies
+
+# List all engines (firewalls/clusters) found in the file
+python -m fp2any.cli "all.xml" --list-engines
+
+# ------------------------------------------------------------
+# 2) FULL EXTRACTION - no filters (used AND unused objects)
+# ------------------------------------------------------------
+# Writes <input>.xlsx with every sheet unfiltered
+python -m fp2any.cli "emaar_exported_data.xml"
+
+# Custom output path with -o
+python -m fp2any.cli "all.xml" -o "outputs\all_full.xlsx"
+
+# ------------------------------------------------------------
+# 3) POLICY FILTER (-p) - scope to one firewall policy
+#    Rule sheets: Policies, Access_Rules, NAT_Rules, Tags
+#    (Migration_Review is Palo-Alto-only; see section 7)
+#    Object sheets trimmed to what the rules reference (groups resolved
+#    transitively): Hosts, Networks, Address_Ranges, Domain_Names,
+#    Router_Elements, IP_Lists, Groups, Service_Groups, Services, URLs,
+#    Expressions.  (URLs = custom URL-list/application objects the rules
+#    reference as services — the customer's URL filtering, with url entries.)
+# ------------------------------------------------------------
+python -m fp2any.cli "emaar_exported_data.xml" -p "HQ_Internal_Policy"
+
+# ------------------------------------------------------------
+# 4) ENGINE FILTER (-e) - scope the infra sheets to one engine
+#    Infra sheets: Interfaces, Routers, Zones, Router_Elements
+#    Servers are ALWAYS extracted in full (never engine-filtered)
+# ------------------------------------------------------------
+python -m fp2any.cli "emaar_exported_data.xml" -e "HQ-Internal_FW"
+
+# ------------------------------------------------------------
+# 5) POLICY + ENGINE together (the usual migration run)
+#    Objects referenced by the policy's rules AND by the engine's
+#    routing table both survive; infra sheets scoped to the engine.
+# ------------------------------------------------------------
+python -m fp2any.cli "all.xml" -p "HQ_Internal_Policy" -e "HQ-Internal_FW"
+python -m fp2any.cli "all.xml" -p "HQ-External-Policy" -e "HQ-External_FW"
+
+# ------------------------------------------------------------
+# 6) NONE FILTER - drop one dimension entirely
+# ------------------------------------------------------------
+# Engine-only view: no rule sheets, objects = what the engine's routes
+# reference, infra scoped to the engine (network-only migration file)
+python -m fp2any.cli "all.xml" -p none -e "HQ-External_FW"
+
+# Policy-only view: rules + referenced objects, infra sheets dropped
+# (Servers always kept; rule-referenced Router_Elements/Zones survive too)
+python -m fp2any.cli "all.xml" -p "HQ-External-Policy" -e none
+
+# NOTE: -p none -e none selects nothing -> empty output (warning printed)
+
+# ------------------------------------------------------------
+# 7) PALO ALTO PAN-OS CLI (--panos)
+#    Sections: address objects, address groups, service objects/groups,
+#    URL categories (custom-url-category from the URLs sheet), tags,
+#    zones (set zone + interface bindings), network interfaces,
+#    virtual routers (static routes), security policies, NAT policies,
+#    review block.  (Interfaces + virtual routers come BEFORE the security/
+#    NAT policies so the objects the rules bind to are defined first.)
+#    CONNECTED routes are NOT emitted as static routes: if a route's
+#    destination is within its interface's own attached subnet, PAN-OS
+#    auto-creates the connected route, so it is skipped (a "# connected route
+#    skipped ..." comment records each). Default routes and summaries stay.
+#    Respects -p / -e filters.
+#    URL LISTS: each Forcepoint url_list_application -> a
+#    `set profiles custom-url-category <name> type "URL List"` + list entries,
+#    wired into the rules that used it via the security rule's `category` field.
+#    IP/path/wildcard entries get a `# review:` comment + a Migration_Review row.
+#    Rule names: <policy>_<tag>, e.g. HQ_Internal_Policy_2101814.0.
+#    Rule from/to zones are auto-derived: sources/destinations resolve to
+#    IPs and match the engine's zone->subnet table (from interfaces +
+#    static routes), most-specific first; no match -> 'External'.
+#    Only zones bound to the in-scope engine(s) appear; zone elements of
+#    OTHER engines named in rules map to 'External' + a review row.
+#    The inferred zones appear on the Access_Rules sheet as the
+#    source_zone / destination_zone columns.
+#    MIGRATION_REVIEW SHEET: --panos ALSO adds a Migration_Review sheet to the
+#    .xlsx (refs that won't resolve to PAN-OS objects). Plain XML->Excel (no
+#    --panos) does NOT include it — it is a Palo Alto migration artifact.
+# ------------------------------------------------------------
+# Default filename: <input>[_<policy>]_panos.txt
+#   e.g. all_HQ_External_Policy_panos.txt
+# Writes BOTH the .txt CLI and the .xlsx (with Migration_Review).
+python -m fp2any.cli "all.xml" -p "HQ-External-Policy" -e "HQ-External_FW" --panos
+
+# Custom PAN-OS output filename
+python -m fp2any.cli "all.xml" -p "HQ-External-Policy" -e "HQ-External_FW" --panos "HQ-External_panos.txt"
+
+# Network-only PAN-OS file (interfaces + static routes + route-referenced
+# addresses, no security rules) -> all_none_panos.txt
+python -m fp2any.cli "all.xml" -p none -e "HQ-External_FW" --panos
+
+# ------------------------------------------------------------
+# 8) WEB GUI - upload/convert/download in the browser
+#    http://127.0.0.1:8000. Flow: upload -> pick Policy/Engine scope
+#    (dropdowns incl. None + live rule/interface counts) -> choose an
+#    operation (Excel sheets / PAN-OS CLI / FortiGate placeholder) with
+#    a progress bar. The scope applies to every operation; the result
+#    pages keep the dropdowns for tweaking afterwards.
+#    "XML to Excel" workbook has NO Migration_Review sheet; the PAN-OS result
+#    page offers a separate "Migration Review (.xlsx)" download that contains
+#    ONLY the Migration_Review sheet (/panos-xlsx/{token}) — the config itself
+#    is the PAN-OS CLI .txt.
+# ------------------------------------------------------------
+python -m web.app
+# or, with auto-reload during development:
+uvicorn web.app:app --reload
+
+# ------------------------------------------------------------
+# 9) TROUBLESHOOTING
+# ------------------------------------------------------------
+# Verbose logging (parser debug output)
+python -m fp2any.cli "all.xml" -v
+
+# Wrong policy/engine name? The CLI prints the available names.
+# "Cannot write .xlsx" -> the file is open in Excel; close it or use -o.
+# Port 8000 already in use (stale server serving old code):
+#   Get-NetTCPConnection -LocalPort 8000 | Select -Expand OwningProcess | Stop-Process -Force
