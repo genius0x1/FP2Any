@@ -18,8 +18,9 @@ web/outputs/
 *.log
 putty.log
 
-# --- Internal project plan (not published) ---
+# --- Internal project plan / docs (not published) ---
 claude.md
+docs/
 
 # --- Python ---
 __pycache__/
