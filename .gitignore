@@ -21,6 +21,7 @@ putty.log
 # --- Internal project plan / docs (not published) ---
 claude.md
 docs/
+commands.txt
 
 # --- Python ---
 __pycache__/

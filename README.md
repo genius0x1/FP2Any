@@ -124,7 +124,7 @@ python -m fp2any.cli exported.xml -p "HQ-External-Policy" -e "HQ-External_FW" --
 Add `-v` for verbose parser logging. If writing the `.xlsx` fails with a
 permission error, the file is probably open in Excel — close it or use `-o`.
 
-> A full annotated command reference lives in [`commands.txt`](commands.txt).
+Run `python -m fp2any.cli --help` for the full list of options.
 
 ### Web GUI
 
@@ -179,9 +179,6 @@ web/
   app.py           # FastAPI web interface
   templates/       # Jinja2 HTML
   static/          # CSS + vendor logos
-docs/
-  phase0_mapping.md  # XML structure analysis & element→XPath mapping
-commands.txt       # annotated command reference
 requirements.txt
 ```
 
